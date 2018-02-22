@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+<title>3D粒子特效DEMO</title>
+<meta charset="UTF-8">
+<style>
+html,body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #000000;
+}
+.container{
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #000000;
+}
+</style>
+<script type="text/javascript" src="js/jquery.min.js"></script>
+</head>
+<body>
+<div style="text-align:center;clear:both">
+</div>
+<div id="lizi" class="container"></div>
+
+</body>
+<script>
+    // 首先定义粒子数量
+    var lizi = {
+        Particle_number: 1000,//粒子数量
+        Particle_radius: 1,//粒子半径
+        Max_angle_rotation: Math.PI / 180,//最大旋转角度π
+        Translation_count: 100, //计数
+   
+   init: function(conf){
+        this.setParameters(conf);
+        this.createParticles();
+        this.setupFigure();
+        this.reconstructMethod();
+        this.bindEvent();
+        this.drawFigure();
+   },
+   //设置粒子参数
+   setParameters: function(conf){
+    // console.log(conf,565);
+    this.window = $(window);
+    // console.log(this.window,565)
+    this.container = $('#lizi');
+    // console.log(this.container);
+    this.width = this.container.width();//获取宽度
+    this.height = this.container.height();//获取高度
+    // console.log(this.width,this.height,456);
+    this.canvas = $('<canvas />').attr({width : this.width, height : this.height}).appendTo(this.container);//在$('#lizi')后面加入canvas
+    // console.log(this.canvas);
+    this.context = this.canvas.get(0).getContext('2d');
+    this.center = {x : this.width / 2, y : this.height / 2};
+    this.x = this.Max_angle_rotation;//x轴
+    this.y = this.Max_angle_rotation;//y轴
+    this.strategyIndex = 0;
+    this.translationCount = 0;
+    this.theta = 0;
+    this.strategies = conf.huoqu();
+    // console.log(this.strategies)
+    // console.log(this.strategies,456);
+    this.particles = [];
+   },
+   // 创建粒子
+   createParticles: function(){
+    for(var i = 0; i<this.Particle_number; i++){
+      this.particles.push(new particulate(this.center));      
+    }
+   },
+   //重铸方法
+   reconstructMethod: function(){
+        this.setupFigure = this.setupFigure.bind(this);
+        this.drawFigure = this.drawFigure.bind(this);
+        this.changeAngle = this.changeAngle.bind(this);
+   },
+   bindEvent: function(){
+    this.container.on('click', this.setupFigure);//点击时变换形状
+    this.container.on('mousemove', this.changeAngle);//鼠标移入时变换角度
+   },
+
+   // 变换粒子角度
+   changeAngle : function(event){
+        var offset = this.container.offset();
+            x = event.clientX - offset.left + this.window.scrollLeft();
+            y = event.clientY - offset.top + this.window.scrollTop();
+        
+        this.x = (this.center.y - y) / this.center.y * this.Max_angle_rotation;
+        this.y = (this.center.x - x) / this.center.x * this.Max_angle_rotation;
+    },
+
+    // 变换粒子形状
+   setupFigure: function(){
+   for(var i = 0, length = this.particles.length; i < length; i++){
+            this.particles[i].setAxis(this.strategies[this.strategyIndex]());
+        }
+        if(++this.strategyIndex == this.strategies.length){
+            this.strategyIndex = 0;
+        }
+        this.translationCount = 0;
+    },
+   
+   // 绘制图形
+   drawFigure: function(){
+    requestAnimationFrame(this.drawFigure);
+     this.context.fillStyle = 'rgba(0, 0, 0, .2)';
+     this.context.fillRect(0, 0, this.width, this.height);
+     // var length = this.particles.length
+     for(var i = 0, length = this.particles.length; i < length; i++){
+        var axis = this.particles[i].getAxis2D(this.theta);
+            
+            this.context.beginPath();
+            this.context.fillStyle = axis.color;
+            this.context.arc(axis.x, axis.y, this.Particle_radius, 0, Math.PI * 2, false);
+            this.context.fill();
+        }
+        this.theta++;
+        this.theta %= 360;
+        
+        for(var i = 0, length = this.particles.length; i < length; i++){
+            this.particles[i].rotateX(this.x);
+            this.particles[i].rotateY(this.y);
+        }
+        this.translationCount++;
+        this.translationCount %= this.Translation_count;
+        
+        if(this.translationCount == 0){
+            this.setupFigure();
+        }
+     }
+
+ };
+ var kuosan = {
+    Scattering_radius:150,//散射半径
+    Cone_length_ratio:1.5,//比例
+    ring_count:100,//环的数量
+    // 获取数据
+     huoqu: function(){
+           var strategies = [];
+           for(var i in this){
+            if(this[i] == arguments.callee || typeof this[i] != 'function'){
+                continue;
+            }
+            strategies.push(this[i].bind(this));
+           }
+           return strategies;
+        },
+    createSphere : function(){//球形
+        var cosTheta = Math.random() * 2 - 1,
+            sinTheta = Math.sqrt(1 - cosTheta * cosTheta),
+            phi = Math.random() * 2 * Math.PI;
+            
+        return {
+            x : this.Scattering_radius * sinTheta * Math.cos(phi),
+            y : this.Scattering_radius * sinTheta * Math.sin(phi),
+            z : this.Scattering_radius * cosTheta,
+            hue : Math.round(phi / Math.PI * 30)
+        };
+    },
+    createTorus : function(){//环形
+        var theta = Math.random() * Math.PI * 2;
+        // console.log(theta,456);
+            x = this.Scattering_radius + this.Scattering_radius / 6 * Math.cos(theta);
+            y = this.Scattering_radius / 6 * Math.sin(theta);
+            phi = Math.random() * Math.PI * 2;
+            // console.log(x,y,phi);
+        return {
+            x : x * Math.cos(phi),
+            y : y,
+            z : x * Math.sin(phi),
+            hue : Math.round(phi / Math.PI * 30)
+        };
+    },
+    createCone : function(){//锥形
+        var status = Math.random() > 1 / 3,
+            x,
+            y,
+            phi = Math.random() * Math.PI * 2,
+            rate = Math.tan(30 / 180 * Math.PI) / this.Cone_length_ratio;
+        
+        if(status){
+            y = this.Scattering_radius * (1 - Math.random() * 2);
+            x = (this.Scattering_radius - y) * rate;
+        }else{
+            y = -this.Scattering_radius;
+            x = this.Scattering_radius * 2 * rate * Math.random();
+        }
+        return {
+            x : x * Math.cos(phi),
+            y : y,
+            z : x * Math.sin(phi),
+            hue : Math.round(phi / Math.PI * 30)
+        };
+    },
+    createVase : function(){//沙漏型
+        var theta = Math.random() * Math.PI,
+            x = Math.abs(this.Scattering_radius * Math.cos(theta) / 2) + this.Scattering_radius / 8,
+            y = this.Scattering_radius * Math.cos(theta) * 1.2,
+            phi = Math.random() * Math.PI * 2;
+        
+        return {
+            x : x * Math.cos(phi),
+            y : y,
+            z : x * Math.sin(phi),
+            hue : Math.round(phi / Math.PI * 30)
+        };
+     }
+    };
+    var particulate = function(center){
+        this.center = center;
+        this.init();
+    };
+    particulate.prototype = {
+    SPRING : 0.01,
+    FRICTION : 0.9,//摩擦力的大小
+    FOCUS_POSITION : 500,//焦点位置
+    COLOR : 'hsl(%hue, 50%, 50%)',//粒子颜色
+    
+    init : function(){
+        this.x = 0;
+        this.y = 0;
+        this.z = 0;
+        this.vx = 0;
+        this.vy = 0;
+        this.vz = 0;
+        this.color;
+    },
+    setAxis : function(axis){
+        this.translating = true;
+        this.nextX = axis.x;
+        this.nextY = axis.y;
+        this.nextZ = axis.z;
+        this.hue = axis.hue;
+    },
+    rotateX : function(angle){
+        var sin = Math.sin(angle),
+            cos = Math.cos(angle),
+            nextY = this.nextY * cos - this.nextZ * sin,
+            nextZ = this.nextZ * cos + this.nextY * sin,
+            y = this.y * cos - this.z * sin,
+            z = this.z * cos + this.y * sin;
+            
+        this.nextY = nextY;
+        this.nextZ = nextZ;
+        this.y = y;
+        this.z = z;
+    },
+    rotateY : function(angle){
+        var sin = Math.sin(angle),
+            cos = Math.cos(angle),
+            nextX = this.nextX * cos - this.nextZ * sin,
+            nextZ = this.nextZ * cos + this.nextX * sin,
+            x = this.x * cos - this.z * sin,
+            z = this.z * cos + this.x * sin;
+            
+        this.nextX = nextX;
+        this.nextZ = nextZ;
+        this.x = x;
+        this.z = z;
+    },
+    rotateZ : function(angle){
+        var sin = Math.sin(angle),
+            cos = Math.cos(angle),
+            nextX = this.nextX * cos - this.nextY * sin,
+            nextY = this.nextY * cos + this.nextX * sin,
+            x = this.x * cos - this.y * sin,
+            y = this.y * cos + this.x * sin;
+            
+        this.nextX = nextX;
+        this.nextY = nextY;
+        this.x = x;
+        this.y = y;
+    },
+    getAxis3D : function(){
+        this.vx += (this.nextX - this.x) * this.SPRING;
+        this.vy += (this.nextY - this.y) * this.SPRING;
+        this.vz += (this.nextZ - this.z) * this.SPRING;
+        
+        this.vx *= this.FRICTION;
+        this.vy *= this.FRICTION;
+        this.vz *= this.FRICTION;
+        
+        this.x += this.vx;
+        this.y += this.vy;
+        this.z += this.vz;
+        
+        return {x : this.x, y : this.y, z : this.z};
+    },
+    getAxis2D : function(theta){
+        var axis = this.getAxis3D(),
+            scale = this.FOCUS_POSITION / (this.FOCUS_POSITION + axis.z);
+            
+        return {x : this.center.x + axis.x * scale, y : this.center.y - axis.y * scale, color : this.COLOR.replace('%hue', this.hue + theta)};
+    }
+};
+ // console.log(lizi);
+ $(function(){
+    lizi.init(kuosan);
+  });
+</script>
+</html>
